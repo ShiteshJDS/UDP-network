@@ -37,6 +37,11 @@ class ClientUDP
     public static void start()
     {
 
+        //DONE: [Create endpoints and socket]
+
+        //DONE: [Create and send HELLO]
+
+        //DONE: [Receive and print Welcome from server]
         try
         {
             Console.WriteLine("CLIENT Starting client application");
