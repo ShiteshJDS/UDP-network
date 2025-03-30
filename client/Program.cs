@@ -34,29 +34,99 @@ class ClientUDP
     static string configContent = File.ReadAllText(configFile);
     static Setting? setting = JsonSerializer.Deserialize<Setting>(configContent);
 
-
     public static void start()
     {
 
-        //TODO: [Create endpoints and socket]
+        //DONE: [Create endpoints and socket]
+
+        //DONE: [Create and send HELLO]
+
+        //DONE: [Receive and print Welcome from server]
+        try
+        {
+            Console.WriteLine("CLIENT Starting client application");
+            
+            // Create endpoints and socket
+            IPAddress serverIPAddress = IPAddress.Parse(setting.ServerIPAddress);
+            IPEndPoint serverEndPoint = new IPEndPoint(serverIPAddress, setting.ServerPortNumber);
+            
+            // Create the UDP socket
+            using Socket clientSocket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
+            
+            // Create a local endpoint for binding
+            IPAddress localIPAddress = IPAddress.Parse(setting.ClientIPAddress);
+            IPEndPoint localEndPoint = new IPEndPoint(localIPAddress, 0); // Use port 0 to get any available port
+            clientSocket.Bind(localEndPoint);
+            
+            Console.WriteLine($"CLIENT connected to {localEndPoint}, connecting to server at {serverEndPoint}");
+            
+            // Create and send HELLO message
+            Random random = new Random();
+            int messageId = random.Next(1, 1000); // Generate random message ID
+            
+            Message helloMessage = new Message
+            {
+                MsgId = messageId,
+                MsgType = MessageType.Hello,
+                Content = "Hello from client"
+            };
+            
+            // Serialize the message to JSON with custom options
+            var options = new JsonSerializerOptions
+            {
+                Converters = { new JsonStringEnumConverter() }
+            };
+            string jsonMessage = JsonSerializer.Serialize(helloMessage, options);
+            byte[] sendBuffer = Encoding.UTF8.GetBytes(jsonMessage);
+
+            // Send the Hello message to the server
+            Console.WriteLine($"CLIENT Hello message: {jsonMessage}");
+            clientSocket.SendTo(sendBuffer, serverEndPoint);
+            
+            // Receive and print Welcome message from server
+            byte[] receiveBuffer = new byte[1024];
+            EndPoint remoteEndPoint = new IPEndPoint(IPAddress.Any, 0);
+            
+            int bytesReceived = clientSocket.ReceiveFrom(receiveBuffer, ref remoteEndPoint);
+            string receivedJson = Encoding.UTF8.GetString(receiveBuffer, 0, bytesReceived);
+            
+            Console.WriteLine($"CLIENT Received from server: {receivedJson}");
+            
+            // Deserialize the received Welcome message
+            Message? welcomeMessage = JsonSerializer.Deserialize<Message>(receivedJson);
+            
+            // Validate the Welcome message
+            if (welcomeMessage != null && welcomeMessage.MsgType == MessageType.Welcome)
+            {
+                Console.WriteLine("CLIENT Handshake completed");
+                Console.WriteLine($"CLIENT Server says: {welcomeMessage.Content}");
+            }
+            else
+            {
+                Console.WriteLine("CLIENT Error: Expected Welcome message, recieved wrong message");
+            }
+            
+            // TODO: [Create and send DNSLookup Message]
 
 
-        //TODO: [Create and send HELLO]
-
-        //TODO: [Receive and print Welcome from server]
-
-        // TODO: [Create and send DNSLookup Message]
+            //TODO: [Receive and print DNSLookupReply from server]
 
 
-        //TODO: [Receive and print DNSLookupReply from server]
+            //TODO: [Send Acknowledgment to Server]
 
+            // TODO: [Send next DNSLookup to server]
+            // repeat the process until all DNSLoopkups (correct and incorrect onces) are sent to server and the replies with DNSLookupReply
 
-        //TODO: [Send Acknowledgment to Server]
+            //TODO: [Receive and print End from server]
+            
+            // Close the socket
+            clientSocket.Close();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[CLIENT] Error: {ex.Message}");
+        }
 
-        // TODO: [Send next DNSLookup to server]
-        // repeat the process until all DNSLoopkups (correct and incorrect onces) are sent to server and the replies with DNSLookupReply
-
-        //TODO: [Receive and print End from server]
 
 
 
