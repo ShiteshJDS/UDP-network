@@ -37,13 +37,6 @@
     "TTL": 3600
   },
   {
-    "Type": "MX",
-    "Name": "example.com",
-    "Value": "mail.example.com",
-    "Priority": 10,
-    "TTL": 3600
-  },
-  {
     "Type": "A",
     "Name": "mail.example.com",
     "Value": "192.168.2.1",

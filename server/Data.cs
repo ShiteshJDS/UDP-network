@@ -21,7 +21,6 @@ namespace LibData
         Welcome,
         DNSLookup,
         DNSLookupReply,
-        DNSRecord,
         Ack,
         End,
         Error
