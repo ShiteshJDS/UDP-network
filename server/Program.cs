@@ -97,9 +97,13 @@ class ServerUDP
                 
                 Console.WriteLine($"SERVER Received from client {clientEndPoint}: {receivedJson}");
                 
-                // Deserialize the received message
-                Message? clientMessage = JsonSerializer.Deserialize<Message>(receivedJson);
-                
+                // Deserialize the received message with custom options
+                var options = new JsonSerializerOptions
+                {
+                    Converters = { new JsonStringEnumConverter() }
+                };
+                Message? clientMessage = JsonSerializer.Deserialize<Message>(receivedJson, options);
+        
                 if (clientMessage != null)
                 {
                     // Handle Hello message
@@ -119,10 +123,6 @@ class ServerUDP
                         };
                         
                         // Serialize the message to JSON with custom options
-                        var options = new JsonSerializerOptions
-                        {
-                            Converters = { new JsonStringEnumConverter() }
-                        };
                         string welcomeJson = JsonSerializer.Serialize(welcomeMessage, options);
                         byte[] sendBuffer = Encoding.UTF8.GetBytes(welcomeJson);
                         
