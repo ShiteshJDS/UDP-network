@@ -8,19 +8,19 @@
     "net8.0": []
   },
   "packageFolders": {
-    "C:\\Users\\Shitesh\\.nuget\\packages\\": {}
+    "C:\\Users\\Cristiano\\.nuget\\packages\\": {}
   },
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "C:\\Users\\Shitesh\\OneDrive - Hogeschool Rotterdam\\Vakken 2024 - 2025 Semester 2\\INFNEW01 Analyse - Networking\\Groepsopdracht\\AssignmentTemplateStudent\\client\\client.csproj",
+      "projectUniqueName": "C:\\Users\\Cristiano\\Desktop\\Networking\\UDP-network\\client\\client.csproj",
       "projectName": "client",
-      "projectPath": "C:\\Users\\Shitesh\\OneDrive - Hogeschool Rotterdam\\Vakken 2024 - 2025 Semester 2\\INFNEW01 Analyse - Networking\\Groepsopdracht\\AssignmentTemplateStudent\\client\\client.csproj",
-      "packagesPath": "C:\\Users\\Shitesh\\.nuget\\packages\\",
-      "outputPath": "C:\\Users\\Shitesh\\OneDrive - Hogeschool Rotterdam\\Vakken 2024 - 2025 Semester 2\\INFNEW01 Analyse - Networking\\Groepsopdracht\\AssignmentTemplateStudent\\client\\obj\\",
+      "projectPath": "C:\\Users\\Cristiano\\Desktop\\Networking\\UDP-network\\client\\client.csproj",
+      "packagesPath": "C:\\Users\\Cristiano\\.nuget\\packages\\",
+      "outputPath": "C:\\Users\\Cristiano\\Desktop\\Networking\\UDP-network\\client\\obj\\",
       "projectStyle": "PackageReference",
       "configFilePaths": [
-        "C:\\Users\\Shitesh\\AppData\\Roaming\\NuGet\\NuGet.Config"
+        "C:\\Users\\Cristiano\\AppData\\Roaming\\NuGet\\NuGet.Config"
       ],
       "originalTargetFrameworks": [
         "net8.0"
@@ -38,11 +38,6 @@
         "warnAsError": [
           "NU1605"
         ]
-      },
-      "restoreAuditProperties": {
-        "enableAudit": "true",
-        "auditLevel": "low",
-        "auditMode": "direct"
       }
     },
     "frameworks": {
@@ -64,7 +59,7 @@
             "privateAssets": "all"
           }
         },
-        "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\8.0.403/PortableRuntimeIdentifierGraph.json"
+        "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\8.0.101/PortableRuntimeIdentifierGraph.json"
       }
     }
   }

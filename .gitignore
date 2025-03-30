@@ -1,0 +1,11 @@
+# Ignore build output directories
+bin/
+obj/
+
+# Ignore Visual Studio and .NET temp files
+*.user
+*.vs
+*.suo
+*.pdb
+*.exe
+*.cache

@@ -66,76 +66,76 @@ class ServerUDP
         try
         {
             Console.WriteLine("SERVER Starting server application...");
-            
+
             // Create a socket and endpoints and bind it to the server IP address and port number
             IPAddress serverIPAddress = IPAddress.Parse(setting.ServerIPAddress);
             IPEndPoint serverEndPoint = new IPEndPoint(serverIPAddress, setting.ServerPortNumber);
-            
+
             // Create the UDP socket
             using Socket serverSocket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
-            
+
             // Bind the socket to the server endpoint
             serverSocket.Bind(serverEndPoint);
-            
+
             Console.WriteLine($"SERVER Server bound to {serverEndPoint}, waiting for client connections...");
-            
+
             // Load DNS records
             List<DNSRecord> dnsRecords = ReadDNSRecords();
             Console.WriteLine($"SERVER Loaded {dnsRecords.Count} DNS records");
-            
+
             // Allocate receive buffer
             byte[] receiveBuffer = new byte[1024];
             EndPoint clientEndPoint = new IPEndPoint(IPAddress.Any, 0);
-            
+
             while (true)
             {
                 Console.WriteLine("SERVER Waiting for incoming messages...");
-                
+
                 // Receive and print a received Message from the client
                 int bytesReceived = serverSocket.ReceiveFrom(receiveBuffer, ref clientEndPoint);
                 string receivedJson = Encoding.UTF8.GetString(receiveBuffer, 0, bytesReceived);
-                
+
                 Console.WriteLine($"SERVER Received from client {clientEndPoint}: {receivedJson}");
-                
+
                 // Deserialize the received message with custom options
                 var options = new JsonSerializerOptions
                 {
                     Converters = { new JsonStringEnumConverter() }
                 };
                 Message? clientMessage = JsonSerializer.Deserialize<Message>(receivedJson, options);
-        
+
                 if (clientMessage != null)
                 {
                     // Handle Hello message
                     if (clientMessage.MsgType == MessageType.Hello)
                     {
                         Console.WriteLine($"SERVER Received Hello from client: {clientMessage.Content}");
-                        
+
                         // Create and send Welcome message
                         Random random = new Random();
                         int messageId = random.Next(1, 10000);
-                        
+
                         Message welcomeMessage = new Message
                         {
                             MsgId = messageId,
                             MsgType = MessageType.Welcome,
                             Content = "Welcome from server"
                         };
-                        
+
                         // Serialize the message to JSON with custom options
                         string welcomeJson = JsonSerializer.Serialize(welcomeMessage, options);
                         byte[] sendBuffer = Encoding.UTF8.GetBytes(welcomeJson);
-                        
+
                         // Send Welcome message to the client
                         Console.WriteLine($"SERVER Sending Welcome message: {welcomeJson}");
                         serverSocket.SendTo(sendBuffer, clientEndPoint);
-                        
+
                         Console.WriteLine("SERVER Handshake completed successfully");
                     }
                     else
                     {
                         Console.WriteLine($"SERVER Received unexpected message type: {clientMessage.MsgType}");
-                        
+
                         // Send Error message
                         Message errorMessage = new Message
                         {
@@ -143,10 +143,10 @@ class ServerUDP
                             MsgType = MessageType.Error,
                             Content = "Expected Hello message, received wrong message"
                         };
-                        
+
                         string errorJson = JsonSerializer.Serialize(errorMessage);
                         byte[] sendBuffer = Encoding.UTF8.GetBytes(errorJson);
-                        
+
                         serverSocket.SendTo(sendBuffer, clientEndPoint);
                     }
                 }
@@ -154,7 +154,7 @@ class ServerUDP
                 {
                     Console.WriteLine("SERVER Received invalid message format");
                 }
-                
+
                 // TODO:[Receive and print DNSLookup]
 
                 // TODO:[Query the DNSRecord in Json file]

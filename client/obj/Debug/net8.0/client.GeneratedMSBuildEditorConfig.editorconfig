@@ -8,6 +8,6 @@ build_property.PlatformNeutralAssembly =
 build_property.EnforceExtendedAnalyzerRules = 
 build_property._SupportedPlatformList = Linux,macOS,Windows
 build_property.RootNamespace = client
-build_property.ProjectDir = C:\Users\Shitesh\OneDrive - Hogeschool Rotterdam\Vakken 2024 - 2025 Semester 2\INFNEW01 Analyse - Networking\Groepsopdracht\AssignmentTemplateStudent\client\
+build_property.ProjectDir = C:\Users\Cristiano\Desktop\Networking\UDP-network\client\
 build_property.EnableComHosting = 
 build_property.EnableGeneratedComInterfaceComImportInterop = 
