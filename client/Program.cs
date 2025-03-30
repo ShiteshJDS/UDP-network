@@ -71,10 +71,14 @@ class ClientUDP
                 Content = "Hello from client"
             };
             
-            // Serialize the message to JSON
-            string jsonMessage = JsonSerializer.Serialize(helloMessage);
+            // Serialize the message to JSON with custom options
+            var options = new JsonSerializerOptions
+            {
+                Converters = { new JsonStringEnumConverter() }
+            };
+            string jsonMessage = JsonSerializer.Serialize(helloMessage, options);
             byte[] sendBuffer = Encoding.UTF8.GetBytes(jsonMessage);
-            
+
             // Send the Hello message to the server
             Console.WriteLine($"CLIENT Hello message: {jsonMessage}");
             clientSocket.SendTo(sendBuffer, serverEndPoint);

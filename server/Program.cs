@@ -7,7 +7,7 @@ using System.Net.Sockets;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
-
+using System.Text.Json.Serialization;
 using LibData;
 
 // ReceiveFrom();
@@ -118,8 +118,12 @@ class ServerUDP
                             Content = "Welcome from server"
                         };
                         
-                        // Serialize Welcome message
-                        string welcomeJson = JsonSerializer.Serialize(welcomeMessage);
+                        // Serialize the message to JSON with custom options
+                        var options = new JsonSerializerOptions
+                        {
+                            Converters = { new JsonStringEnumConverter() }
+                        };
+                        string welcomeJson = JsonSerializer.Serialize(welcomeMessage, options);
                         byte[] sendBuffer = Encoding.UTF8.GetBytes(welcomeJson);
                         
                         // Send Welcome message to the client
