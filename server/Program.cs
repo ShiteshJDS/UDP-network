@@ -146,14 +146,12 @@ class ServerUDP
 
                         if (matchingRecord != null)
                         {
-                            // Create DNSLookupReply with the found record
-                            string recordJson = JsonSerializer.Serialize(matchingRecord, options);
-                            
+                            // Create DNSLookupReply with the found record                            
                             Message dnsReplyMessage = new Message
                             {
                                 MsgId = new Random().Next(1, 10000),
                                 MsgType = MessageType.DNSLookupReply,
-                                Content = recordJson
+                                Content = matchingRecord
                             };
                             
                             string replyJson = JsonSerializer.Serialize(dnsReplyMessage, options);

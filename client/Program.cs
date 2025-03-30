@@ -112,7 +112,7 @@ class ClientUDP
                 Console.WriteLine();
 
                 // DNS Lookup domain
-                string domain = "www.example.com";
+                string domain = "www.sample.com";
                 
                 // Create DNSLookup message
                 messageId = random.Next(1, 1000);
