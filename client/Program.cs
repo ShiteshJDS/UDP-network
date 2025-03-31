@@ -36,7 +36,7 @@ class ClientUDP
     {
         byte[] buffer = new byte[1024];
         Socket sock;
-        
+
         try
         {
             Console.WriteLine("========== CLIENT APPLICATION STARTING ==========");
@@ -44,7 +44,7 @@ class ClientUDP
             Console.WriteLine();
 
             Console.WriteLine("CLIENT Starting client application");
-            
+
             // Create endpoints using settings file
             IPAddress serverIPAddress = IPAddress.Parse(setting.ServerIPAddress);
             IPEndPoint ServerEndpoint = new IPEndPoint(serverIPAddress, setting.ServerPortNumber);
@@ -52,7 +52,7 @@ class ClientUDP
             // Create local endpoint for binding
             IPAddress localIPAddress = IPAddress.Parse(setting.ClientIPAddress);
             IPEndPoint localEndPoint = new IPEndPoint(localIPAddress, 0);
-            
+
             IPEndPoint sender = new IPEndPoint(IPAddress.Any, 0);
             EndPoint remoteEP = (EndPoint)sender;
             Thread.Sleep(3500);
@@ -61,7 +61,7 @@ class ClientUDP
             // Create socket
             Console.WriteLine("CLIENT: Creating and binding socket...");
             sock = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
-            sock.Bind(localEndPoint);           
+            sock.Bind(localEndPoint);
             Thread.Sleep(3500);
             Console.WriteLine();
 
@@ -74,7 +74,7 @@ class ClientUDP
                 MsgType = MessageType.Hello,
                 Content = "Hello from client"
             };
-            
+
             // Serialize message
             var options = new JsonSerializerOptions
             {
@@ -99,10 +99,10 @@ class ClientUDP
             Console.WriteLine($"CLIENT Received from server: {receivedJson}");
             Thread.Sleep(3500);
             Console.WriteLine();
-            
+
             // Deserialize Welcome message
             Message? welcomeMessage = JsonSerializer.Deserialize<Message>(receivedJson, options);
-            
+
             // Validate Welcome message
             if (welcomeMessage != null && welcomeMessage.MsgType == MessageType.Welcome)
             {
@@ -113,16 +113,23 @@ class ClientUDP
 
                 // DNS Lookup domain
                 string domain = "www.sample.com";
-                
-                // Create DNSLookup message
-                messageId = random.Next(1, 1000);
+
+                // Create a proper DNSRecord object for lookup
+                DNSRecord lookupRecord = new DNSRecord
+                {
+                    Type = "A",  // Could be "A", "MX", etc.
+                    Name = domain
+                    // Value, TTL, and Priority are not needed for the lookup request
+                };
+
+                // Create DNSLookup message with the DNSRecord object
                 Message dnsLookupMessage = new Message
                 {
                     MsgId = messageId,
                     MsgType = MessageType.DNSLookup,
-                    Content = domain
+                    Content = lookupRecord
                 };
-                
+
                 // Serialize and send DNSLookup message
                 jsonMessage = JsonSerializer.Serialize(dnsLookupMessage, options);
                 msg = Encoding.UTF8.GetBytes(jsonMessage);
@@ -141,7 +148,7 @@ class ClientUDP
 
                 // Deserialize DNSLookupReply
                 Message? dnsReplyMessage = JsonSerializer.Deserialize<Message>(receivedJson, options);
-                
+
                 if (dnsReplyMessage != null)
                 {
                     if (dnsReplyMessage.MsgType == MessageType.DNSLookupReply)
@@ -149,7 +156,7 @@ class ClientUDP
                         Console.WriteLine("========== CLIENT DNS LOOKUP SUCCESSFUL ==========");
                         string recordJson = dnsReplyMessage.Content.ToString();
                         DNSRecord? record = JsonSerializer.Deserialize<DNSRecord>(recordJson, options);
-                        
+
                         if (record != null)
                         {
                             Console.WriteLine($"Type: {record.Type}");
@@ -161,7 +168,7 @@ class ClientUDP
                                 Console.WriteLine($"Priority: {record.Priority}");
                             }
                         }
-                        
+
                         // Send Acknowledgment
                         messageId = random.Next(1, 1000);
                         Message ackMessage = new Message
@@ -170,7 +177,7 @@ class ClientUDP
                             MsgType = MessageType.Ack,
                             Content = dnsLookupMessage.MsgId
                         };
-                        
+
                         jsonMessage = JsonSerializer.Serialize(ackMessage, options);
                         msg = Encoding.UTF8.GetBytes(jsonMessage);
                         Console.WriteLine($"CLIENT Acknowledgment message: {jsonMessage}");
@@ -202,7 +209,7 @@ class ClientUDP
             {
                 Console.WriteLine("CLIENT Error: Expected Welcome message, received wrong message");
             }
-            
+
             sock.Close();
         }
         catch (Exception ex)

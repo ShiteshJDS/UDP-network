@@ -53,11 +53,11 @@ class ServerUDP
 
 
 
-   public static void start()
+    public static void start()
     {
         byte[] buffer = new byte[1024];
         Socket sock;
-        
+
         try
         {
 
@@ -66,19 +66,19 @@ class ServerUDP
             Console.WriteLine();
 
             Console.WriteLine("SERVER Starting server...");
-            
+
             // Create endpoints using settings file as in original
             IPAddress ipAddress = IPAddress.Parse(setting.ServerIPAddress);
             IPEndPoint localEndpoint = new IPEndPoint(ipAddress, setting.ServerPortNumber);
-            
+
             IPEndPoint sender = new IPEndPoint(IPAddress.Any, 0);
             EndPoint remoteEP = (EndPoint)sender;
-            
+
             // Create and bind socket
             Console.WriteLine("SERVER: Creating and binding socket...");
             sock = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
             sock.Bind(localEndpoint);
-            
+
             Console.WriteLine($"SERVER Server bound to {localEndpoint}, waiting for client connections...");
             Thread.Sleep(3500);
             Console.WriteLine();
@@ -94,7 +94,7 @@ class ServerUDP
             {
                 Console.WriteLine("\n========== WAITING FOR CLIENT MESSAGE ==========");
                 Thread.Sleep(3500);
-                
+
                 // Receive message from client
                 Console.WriteLine("SERVER: Waiting for client message...");
                 int bytesReceived = sock.ReceiveFrom(buffer, ref remoteEP);
@@ -109,13 +109,13 @@ class ServerUDP
                     Converters = { new JsonStringEnumConverter() }
                 };
                 Message? clientMessage = JsonSerializer.Deserialize<Message>(receivedJson, options);
-                
+
                 if (clientMessage != null)
                 {
                     if (clientMessage.MsgType == MessageType.Hello)
                     {
                         Console.WriteLine($"SERVER Received Hello from client: {clientMessage.Content}");
-                        
+
                         // Create Welcome message
                         Random random = new Random();
                         int messageId = random.Next(1, 10000);
@@ -125,10 +125,10 @@ class ServerUDP
                             MsgType = MessageType.Welcome,
                             Content = "Welcome from server"
                         };
-                        
+
                         // Serialize and send Welcome message
                         string welcomeJson = JsonSerializer.Serialize(welcomeMessage, options);
-                        byte[] msg = Encoding.UTF8.GetBytes(welcomeJson);                        
+                        byte[] msg = Encoding.UTF8.GetBytes(welcomeJson);
                         Console.WriteLine($"SERVER Sending Welcome message: {welcomeJson}");
                         sock.SendTo(msg, msg.Length, SocketFlags.None, remoteEP);
                         Thread.Sleep(3500);
@@ -138,43 +138,53 @@ class ServerUDP
                     }
                     else if (clientMessage.MsgType == MessageType.DNSLookup)
                     {
-                        string domainName = clientMessage.Content.ToString();
-                        Console.WriteLine($"SERVER Received DNS Lookup for: {domainName}");
-                        
-                        // Find matching DNS record, through list with LINQ
-                        DNSRecord matchingRecord = dnsRecords.FirstOrDefault(r => r.Name == domainName);
+                        // Deserialize the Content property into a DNSRecord object
+                        DNSRecord? lookupRecord = JsonSerializer.Deserialize<DNSRecord>(clientMessage.Content.ToString(), options);
 
-                        if (matchingRecord != null)
+                        if (lookupRecord != null)
                         {
-                            // Create DNSLookupReply with the found record                            
-                            Message dnsReplyMessage = new Message
+                            string domainName = lookupRecord.Name;
+                            Console.WriteLine($"SERVER Received DNS Lookup for: {domainName}");
+
+                            // Find matching DNS record, through list with LINQ
+                            DNSRecord matchingRecord = dnsRecords.FirstOrDefault(r => r.Name == domainName);
+
+                            if (matchingRecord != null)
                             {
-                                MsgId = new Random().Next(1, 10000),
-                                MsgType = MessageType.DNSLookupReply,
-                                Content = matchingRecord
-                            };
-                            
-                            string replyJson = JsonSerializer.Serialize(dnsReplyMessage, options);
-                            byte[] msg = Encoding.UTF8.GetBytes(replyJson);
-                            
-                            Console.WriteLine($"SERVER Sending DNSLookupReply: {replyJson}");
-                            sock.SendTo(msg, msg.Length, SocketFlags.None, remoteEP);
+                                // Create DNSLookupReply with the found record                            
+                                Message dnsReplyMessage = new Message
+                                {
+                                    MsgId = clientMessage.MsgId,
+                                    MsgType = MessageType.DNSLookupReply,
+                                    Content = matchingRecord
+                                };
+
+                                string replyJson = JsonSerializer.Serialize(dnsReplyMessage, options);
+                                byte[] msg = Encoding.UTF8.GetBytes(replyJson);
+
+                                Console.WriteLine($"SERVER Sending DNSLookupReply: {replyJson}");
+                                sock.SendTo(msg, msg.Length, SocketFlags.None, remoteEP);
+                            }
+                            else
+                            {
+                                // Send Error message if record not found
+                                Message errorMessage = new Message
+                                {
+                                    MsgId = new Random().Next(1, 10000),
+                                    MsgType = MessageType.Error,
+                                    Content = $"Domain not found"
+                                };
+
+                                string errorJson = JsonSerializer.Serialize(errorMessage, options);
+                                byte[] msg = Encoding.UTF8.GetBytes(errorJson);
+
+                                Console.WriteLine($"SERVER Sending Error message: {errorJson}");
+                                sock.SendTo(msg, msg.Length, SocketFlags.None, remoteEP);
+                            }
                         }
                         else
                         {
-                            // Send Error message if record not found
-                            Message errorMessage = new Message
-                            {
-                                MsgId = new Random().Next(1, 10000),
-                                MsgType = MessageType.Error,
-                                Content = $"Domain not found"
-                            };
-                            
-                            string errorJson = JsonSerializer.Serialize(errorMessage, options);
-                            byte[] msg = Encoding.UTF8.GetBytes(errorJson);
-                            
-                            Console.WriteLine($"SERVER Sending Error message: {errorJson}");
-                            sock.SendTo(msg, msg.Length, SocketFlags.None, remoteEP);
+                            Console.WriteLine("SERVER Error: Invalid DNS Lookup message content");
                         }
                         Thread.Sleep(3500);
                         Console.WriteLine();
@@ -182,7 +192,7 @@ class ServerUDP
                     else if (clientMessage.MsgType == MessageType.Ack)
                     {
                         Console.WriteLine($"SERVER Received Acknowledgment: {clientMessage.Content}");
-                        
+
                         // Send End message
                         Message endMessage = new Message
                         {
@@ -190,10 +200,10 @@ class ServerUDP
                             MsgType = MessageType.End,
                             Content = "Session completed"
                         };
-                        
+
                         string endJson = JsonSerializer.Serialize(endMessage, options);
                         byte[] msg = Encoding.UTF8.GetBytes(endJson);
-                        
+
                         Console.WriteLine($"SERVER Sending End message: {endJson}");
                         sock.SendTo(msg, msg.Length, SocketFlags.None, remoteEP);
                         Thread.Sleep(3500);
@@ -204,7 +214,7 @@ class ServerUDP
                     else
                     {
                         Console.WriteLine($"SERVER Received unexpected message type: {clientMessage.MsgType}");
-                        
+
                         // Send Error message
                         Message errorMessage = new Message
                         {
@@ -212,7 +222,7 @@ class ServerUDP
                             MsgType = MessageType.Error,
                             Content = "Unexpected message type"
                         };
-                        
+
                         string errorJson = JsonSerializer.Serialize(errorMessage, options);
                         byte[] msg = Encoding.UTF8.GetBytes(errorJson);
                         Console.WriteLine($"SERVER: Sending Error message: {errorJson}");
