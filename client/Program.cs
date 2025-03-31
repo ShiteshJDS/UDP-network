@@ -47,7 +47,7 @@ class ClientUDP
         try
         {
             Console.WriteLine("========== CLIENT APPLICATION STARTING ==========");
-            Thread.Sleep(1000);
+            Thread.Sleep(3000);
             Console.WriteLine();
 
             InitializeConnection();
@@ -59,7 +59,7 @@ class ClientUDP
             {
                 Console.WriteLine("========== CLIENT HANDSHAKE COMPLETED ==========");
                 Console.WriteLine($"CLIENT Server says: {welcomeMessage.Content}");
-                Thread.Sleep(1000);
+                Thread.Sleep(3000);
                 Console.WriteLine();
                 
                 // Perform multiple DNS lookups as required
@@ -92,14 +92,14 @@ class ClientUDP
 
         IPEndPoint sender = new IPEndPoint(IPAddress.Any, 0);
         remoteEP = sender;
-        Thread.Sleep(1000);
+        Thread.Sleep(3000);
         Console.WriteLine();
 
         // Create socket
         Console.WriteLine("CLIENT: Creating and binding socket...");
         socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
         socket.Bind(localEndPoint);
-        Thread.Sleep(1000);
+        Thread.Sleep(3000);
         Console.WriteLine();
     }
     
@@ -197,6 +197,9 @@ class ClientUDP
                     {
                         Console.WriteLine($"Priority: {record.Priority}");
                     }
+
+                    // Send Acknowledgment
+                    SendAcknowledgment(lookupMessageId);
                 }
             }
             catch (Exception ex)
@@ -213,9 +216,6 @@ class ClientUDP
             Console.WriteLine($"CLIENT Unexpected response type: {response.MsgType}");
             return;
         }
-
-        // Send Acknowledgment
-        SendAcknowledgment(lookupMessageId);
         
         // Wait for End message after the last DNS lookup
         Message? endMessage = ReceiveMessage("End");
@@ -249,7 +249,7 @@ class ClientUDP
         
         Console.WriteLine($"CLIENT: {jsonMessage}");
         socket.SendTo(msg, msg.Length, SocketFlags.None, serverEndpoint);
-        Thread.Sleep(1000);
+        Thread.Sleep(3000);
         Console.WriteLine();
     }
     
@@ -261,7 +261,7 @@ class ClientUDP
         string receivedJson = Encoding.UTF8.GetString(buffer, 0, bytesReceived);
         
         Console.WriteLine($"CLIENT Received from server: {receivedJson}");
-        Thread.Sleep(1000);
+        Thread.Sleep(3000);
         Console.WriteLine();
         
         return JsonSerializer.Deserialize<Message>(receivedJson, options);

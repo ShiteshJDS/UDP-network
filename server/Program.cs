@@ -48,7 +48,7 @@ class ServerUDP
         try
         {
             Console.WriteLine("========== SERVER APPLICATION STARTING ==========");
-            Thread.Sleep(1000);
+            Thread.Sleep(3000);
             Console.WriteLine();
 
             Console.WriteLine("SERVER Starting server...");
@@ -77,7 +77,7 @@ class ServerUDP
         socket.Bind(localEndpoint);
 
         Console.WriteLine($"SERVER Server bound to {localEndpoint}, waiting for client connections...");
-        Thread.Sleep(1000);
+        Thread.Sleep(3000);
         Console.WriteLine();
     }
     
@@ -86,7 +86,7 @@ class ServerUDP
         Console.WriteLine("SERVER: Loading DNS records...");
         dnsRecords = ReadDNSRecords();
         Console.WriteLine($"SERVER Loaded {dnsRecords.Count} DNS records");
-        Thread.Sleep(1000);
+        Thread.Sleep(3000);
         Console.WriteLine();
     }
     
@@ -98,7 +98,7 @@ class ServerUDP
         while (true)
         {
             Console.WriteLine("\n========== WAITING FOR CLIENT MESSAGE ==========");
-            Thread.Sleep(1000);
+            Thread.Sleep(3000);
 
             // Receive message from client
             Message? clientMessage = ReceiveMessage(ref remoteEP);
@@ -250,7 +250,7 @@ class ServerUDP
         string receivedJson = Encoding.UTF8.GetString(buffer, 0, bytesReceived);
         
         Console.WriteLine($"SERVER Received from client {remoteEP}: {receivedJson}");
-        Thread.Sleep(1000);
+        Thread.Sleep(3000);
         Console.WriteLine();
         
         try
@@ -272,7 +272,7 @@ class ServerUDP
         
         Console.WriteLine($"SERVER Sending {type} message: {messageJson}");
         socket.SendTo(msg, msg.Length, SocketFlags.None, remoteEP);
-        Thread.Sleep(1000);
+        Thread.Sleep(3000);
         Console.WriteLine();
     }
 
