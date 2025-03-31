@@ -138,6 +138,22 @@ class ClientUDP
         {
             PerformSingleDNSLookup(domain, "A");  // Using A record type
         }
+        
+        // After all lookups, wait a bit longer for the final End message
+        try
+        {
+            socket.ReceiveTimeout = 5000; // 5 second timeout for final End message
+            Message? endMessage = ReceiveMessage("End");
+            
+            if (endMessage != null && endMessage.MsgType == MessageType.End)
+            {
+                Console.WriteLine("========== CLIENT SESSION ENDED ==========");
+            }
+        }
+        catch (SocketException)
+        {
+            Console.WriteLine("CLIENT: Did not receive End message after all lookups completed");
+        }
     }
     
     private static void PerformSingleDNSLookup(string domain, string recordType)
@@ -217,13 +233,7 @@ class ClientUDP
             return;
         }
         
-        // Wait for End message after the last DNS lookup
-        Message? endMessage = ReceiveMessage("End");
-        
-        if (endMessage != null && endMessage.MsgType == MessageType.End)
-        {
-            Console.WriteLine("========== CLIENT SESSION ENDED ==========");
-        }
+        CheckForEndMessage();
     }
     
     private static void SendAcknowledgment(int originalMessageId)
@@ -265,5 +275,31 @@ class ClientUDP
         Console.WriteLine();
         
         return JsonSerializer.Deserialize<Message>(receivedJson, options);
+    }
+
+    // Add a separate method to check for End message
+    private static void CheckForEndMessage()
+    {
+        try
+        {
+            // Check if there's a message waiting with a shorter timeout
+            socket.ReceiveTimeout = 1000; // 1 second timeout
+            Message? endMessage = ReceiveMessage("End");
+            
+            if (endMessage != null && endMessage.MsgType == MessageType.End)
+            {
+                Console.WriteLine("========== CLIENT SESSION ENDED ==========");
+                // Exit the application
+                Environment.Exit(0);
+            }
+            
+            // Reset timeout to default
+            socket.ReceiveTimeout = 0;
+        }
+        catch (SocketException ex) when (ex.SocketErrorCode == SocketError.TimedOut)
+        {
+            // No message available, continue with next lookup
+            socket.ReceiveTimeout = 0;
+        }
     }
 }

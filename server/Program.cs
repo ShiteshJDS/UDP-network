@@ -43,6 +43,11 @@ class ServerUDP
     private static readonly byte[] buffer = new byte[1024];
     private static List<DNSRecord> dnsRecords = new();
 
+
+    // Counter to track lookups
+    private static int lookupCounter = 0;
+    private static int expectedLookups = 4;
+
     public static void start()
     {
         try
@@ -155,6 +160,9 @@ class ServerUDP
     
     private static void HandleDNSLookupMessage(Message clientMessage, EndPoint remoteEP)
     {
+        // Increment counter for each lookup (valid or invalid)
+        lookupCounter++;
+
         try
         {
             // Deserialize the Content property into a DNSRecord object
@@ -190,6 +198,14 @@ class ServerUDP
             Console.WriteLine($"SERVER Error processing DNS Lookup: {ex.Message}");
             SendErrorMessage("Error processing DNS request", remoteEP);
         }
+
+        // Check if all lookups are completed
+        if (lookupCounter >= expectedLookups)
+        {
+            SendEndMessage(remoteEP);
+            Console.WriteLine("========== SERVER SESSION COMPLETED ==========");
+            lookupCounter = 0; // Reset counter for the next session
+        }
     }
     
     private static void HandleAcknowledgmentMessage(Message clientMessage, EndPoint remoteEP)
@@ -197,8 +213,14 @@ class ServerUDP
         Console.WriteLine($"SERVER Received Acknowledgment for message ID: {clientMessage.Content}");
 
         // Send End message
-        SendEndMessage(remoteEP);
-        Console.WriteLine("========== SERVER SESSION COMPLETED ==========");
+        // Only send End message if this is the last expected lookup
+        if (lookupCounter >= expectedLookups)
+        {
+            SendEndMessage(remoteEP);
+            Console.WriteLine("========== SERVER SESSION COMPLETED ==========");
+            // Reset counter for next client
+            lookupCounter = 0;
+        }
     }
     
     private static void HandleUnexpectedMessage(Message clientMessage, EndPoint remoteEP)
