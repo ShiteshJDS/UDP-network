@@ -35,7 +35,7 @@ class ClientUDP
     {
         Converters = { new JsonStringEnumConverter() }
     };
-    
+
     private static Socket? socket;
     private static IPEndPoint? serverEndpoint;
     private static EndPoint? remoteEP;
@@ -51,17 +51,17 @@ class ClientUDP
             Console.WriteLine();
 
             InitializeConnection();
-            
+
             // Start protocol flow
             var welcomeMessage = PerformHandshake();
-            
+
             if (welcomeMessage != null && welcomeMessage.MsgType == MessageType.Welcome)
             {
                 Console.WriteLine("========== CLIENT HANDSHAKE COMPLETED ==========");
                 Console.WriteLine($"CLIENT Server says: {welcomeMessage.Content}");
                 Thread.Sleep(3000);
                 Console.WriteLine();
-                
+
                 // Perform multiple DNS lookups as required
                 PerformDNSLookups();
             }
@@ -77,7 +77,7 @@ class ClientUDP
             Console.WriteLine($"\n Socket Error. Terminating: {ex.Message}");
         }
     }
-    
+
     private static void InitializeConnection()
     {
         Console.WriteLine("CLIENT Starting client application");
@@ -97,12 +97,20 @@ class ClientUDP
 
         // Create socket
         Console.WriteLine("CLIENT: Creating and binding socket...");
-        socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
-        socket.Bind(localEndPoint);
+        try
+        {
+            socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
+            socket.Bind(localEndPoint);
+            Console.WriteLine("CLIENT: Socket created and bound successfully");
+        }
+        catch (SocketException ex)
+        {
+            throw new InvalidOperationException($"Failed to create or bind socket: {ex.Message}", ex);
+        }
         Thread.Sleep(3000);
         Console.WriteLine();
     }
-    
+
     private static Message? PerformHandshake()
     {
         // Create and send Hello message
@@ -115,36 +123,36 @@ class ClientUDP
         };
 
         SendMessage(helloMessage);
-        
+
         // Receive Welcome message
         return ReceiveMessage("Welcome");
     }
-    
+
     private static void PerformDNSLookups()
     {
         // Valid domains (existing in the server's DNS records)
         string[] validDomains = { "www.sample.com", "www.test.com" };
-        
+
         // Invalid domains (non-existent in the server's DNS records)
         string[] invalidDomains = { "www.abc.com", "www.abcd.com" };
-        
+
         // Process all lookups
         foreach (var domain in validDomains)
         {
             PerformSingleDNSLookup(domain, "A");  // Using A record type
         }
-        
+
         foreach (var domain in invalidDomains)
         {
             PerformSingleDNSLookup(domain, "A");  // Using A record type
         }
-        
+
         // After all lookups, wait a bit longer for the final End message
         try
         {
             socket.ReceiveTimeout = 5000; // 5 second timeout for final End message
             Message? endMessage = ReceiveMessage("End");
-            
+
             if (endMessage != null && endMessage.MsgType == MessageType.End)
             {
                 Console.WriteLine("========== CLIENT SESSION ENDED ==========");
@@ -155,11 +163,11 @@ class ClientUDP
             Console.WriteLine("CLIENT: Did not receive End message after all lookups completed");
         }
     }
-    
+
     private static void PerformSingleDNSLookup(string domain, string recordType)
     {
         Console.WriteLine($"\n========== CLIENT PERFORMING DNS LOOKUP FOR {domain} ==========");
-        
+
         // Create a proper DNSRecord object for lookup
         DNSRecord lookupRecord = new DNSRecord
         {
@@ -177,10 +185,10 @@ class ClientUDP
         };
 
         SendMessage(dnsLookupMessage);
-        
+
         // Receive response (could be DNSLookupReply or Error)
         Message? response = ReceiveMessage("DNS Lookup Reply");
-        
+
         if (response != null)
         {
             ProcessDNSResponse(response, messageId);
@@ -190,13 +198,13 @@ class ClientUDP
             Console.WriteLine("CLIENT Error: No response received from server");
         }
     }
-    
+
     private static void ProcessDNSResponse(Message response, int lookupMessageId)
     {
         if (response.MsgType == MessageType.DNSLookupReply)
         {
             Console.WriteLine("========== CLIENT DNS LOOKUP SUCCESSFUL ==========");
-            
+
             // Handle DNS record
             try
             {
@@ -232,10 +240,10 @@ class ClientUDP
             Console.WriteLine($"CLIENT Unexpected response type: {response.MsgType}");
             return;
         }
-        
+
         CheckForEndMessage();
     }
-    
+
     private static void SendAcknowledgment(int originalMessageId)
     {
         int messageId = random.Next(1, 10000);
@@ -248,33 +256,81 @@ class ClientUDP
 
         SendMessage(ackMessage, "Acknowledgment");
     }
-    
+
     private static void SendMessage(Message message, string messageType = "")
     {
         string type = string.IsNullOrEmpty(messageType) ? message.MsgType.ToString() : messageType;
         Console.WriteLine($"CLIENT: Sending {type} message...");
-        
+
         string jsonMessage = JsonSerializer.Serialize(message, options);
         byte[] msg = Encoding.UTF8.GetBytes(jsonMessage);
-        
+
         Console.WriteLine($"CLIENT: {jsonMessage}");
         socket.SendTo(msg, msg.Length, SocketFlags.None, serverEndpoint);
         Thread.Sleep(3000);
         Console.WriteLine();
     }
-    
+
     private static Message? ReceiveMessage(string expectedType)
     {
         Console.WriteLine($"CLIENT: Waiting for {expectedType} message...");
-        
-        int bytesReceived = socket.ReceiveFrom(buffer, ref remoteEP);
-        string receivedJson = Encoding.UTF8.GetString(buffer, 0, bytesReceived);
-        
-        Console.WriteLine($"CLIENT Received from server: {receivedJson}");
-        Thread.Sleep(3000);
-        Console.WriteLine();
-        
-        return JsonSerializer.Deserialize<Message>(receivedJson, options);
+
+        try
+        {
+            int bytesReceived = socket.ReceiveFrom(buffer, ref remoteEP);
+            if (bytesReceived == 0)
+            {
+                Console.WriteLine("CLIENT Error: Received empty message");
+                return null;
+            }
+
+            string receivedJson = Encoding.UTF8.GetString(buffer, 0, bytesReceived);
+
+            Console.WriteLine($"CLIENT Received from server: {receivedJson}");
+            Thread.Sleep(3000);
+            Console.WriteLine();
+
+            // Deserialize and validate message
+            Message? message = JsonSerializer.Deserialize<Message>(receivedJson, options);
+            if (message == null)
+            {
+                Console.WriteLine("CLIENT Error: Failed to deserialize message");
+                return null;
+            }
+
+            // Validate expected message type
+            if (expectedType == "DNS Lookup Reply" &&
+                message.MsgType != MessageType.DNSLookupReply &&
+                message.MsgType != MessageType.Error)
+            {
+                Console.WriteLine($"CLIENT Error: Expected DNSLookupReply or Error, but received {message.MsgType}");
+            }
+            else if (expectedType == "Welcome" && message.MsgType != MessageType.Welcome)
+            {
+                Console.WriteLine($"CLIENT Error: Expected Welcome message, but received {message.MsgType}");
+            }
+            else if (expectedType == "End" && message.MsgType != MessageType.End)
+            {
+                Console.WriteLine($"CLIENT Error: Expected End message, but received {message.MsgType}");
+            }
+
+            return message;
+        }
+        catch (SocketException ex)
+        {
+            Console.WriteLine($"CLIENT Socket error receiving message: {ex.Message}");
+            return null;
+        }
+        catch (JsonException ex)
+        {
+            Console.WriteLine($"CLIENT Error parsing received message: {ex.Message}");
+            return null;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"CLIENT Unexpected error receiving message: {ex.Message}");
+            return null;
+        }
     }
 
     // Add a separate method to check for End message
@@ -285,14 +341,14 @@ class ClientUDP
             // Check if there's a message waiting with a shorter timeout
             socket.ReceiveTimeout = 1000; // 1 second timeout
             Message? endMessage = ReceiveMessage("End");
-            
+
             if (endMessage != null && endMessage.MsgType == MessageType.End)
             {
                 Console.WriteLine("========== CLIENT SESSION ENDED ==========");
                 // Exit the application
                 Environment.Exit(0);
             }
-            
+
             // Reset timeout to default
             socket.ReceiveTimeout = 0;
         }
