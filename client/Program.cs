@@ -201,6 +201,18 @@ class ClientUDP
 
     private static void ProcessDNSResponse(Message response, int lookupMessageId)
     {
+        if (response == null)
+        {
+            Console.WriteLine("CLIENT Error: Null response received");
+            return;
+        }
+
+        // Validate message ID matches the original request
+        if (response.MsgType == MessageType.DNSLookupReply && response.MsgId != lookupMessageId)
+        {
+            Console.WriteLine($"CLIENT Error: Message ID mismatch. Expected {lookupMessageId}, got {response.MsgId}");
+        }
+
         if (response.MsgType == MessageType.DNSLookupReply)
         {
             Console.WriteLine("========== CLIENT DNS LOOKUP SUCCESSFUL ==========");
@@ -208,6 +220,12 @@ class ClientUDP
             // Handle DNS record
             try
             {
+                if (response.Content == null)
+                {
+                    Console.WriteLine("CLIENT Error: DNSLookupReply has null content");
+                    return;
+                }
+
                 string recordJson = response.Content.ToString();
                 DNSRecord? record = JsonSerializer.Deserialize<DNSRecord>(recordJson, options);
 
@@ -225,10 +243,18 @@ class ClientUDP
                     // Send Acknowledgment
                     SendAcknowledgment(lookupMessageId);
                 }
+                else
+                {
+                    Console.WriteLine("CLIENT Error: Failed to deserialize DNS record");
+                }
+            }
+            catch (JsonException ex)
+            {
+                Console.WriteLine($"CLIENT Error parsing DNS record: {ex.Message}");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"CLIENT Error parsing DNS record: {ex.Message}");
+                Console.WriteLine($"CLIENT Unexpected error processing DNS record: {ex.Message}");
             }
         }
         else if (response.MsgType == MessageType.Error)
