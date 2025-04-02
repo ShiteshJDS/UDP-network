@@ -75,18 +75,20 @@ class ServerUDP
     
     private static void InitializeSocket()
     {
-        // Create endpoints using settings file
-        IPAddress ipAddress = IPAddress.Parse(setting.ServerIPAddress);
-        IPEndPoint localEndpoint = new IPEndPoint(ipAddress, setting.ServerPortNumber);
+        try // error handling: socket creation
+        {
+            IPAddress ipAddress = IPAddress.Parse(setting.ServerIPAddress);
+            IPEndPoint localEndpoint = new IPEndPoint(ipAddress, setting.ServerPortNumber);
 
-        // Create and bind socket
-        Console.WriteLine("SERVER: Creating and binding socket...");
-        socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
-        socket.Bind(localEndpoint);
-
-        Console.WriteLine($"SERVER Server bound to {localEndpoint}, waiting for client connections...");
-        Thread.Sleep(3000);
-        Console.WriteLine();
+            Console.WriteLine("SERVER: Creating and binding socket...");
+            socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
+            socket.Bind(localEndpoint);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"SERVER Error initializing socket: {ex.Message}");
+            Environment.Exit(1);
+        }
     }
     
     private static void LoadDNSRecords()
@@ -136,6 +138,8 @@ class ServerUDP
         while (true)
         {
             Console.WriteLine("\n========== WAITING FOR CLIENT MESSAGE ==========");
+            Console.WriteLine();
+
             Thread.Sleep(3000);
 
             // Receive message from client
@@ -169,24 +173,33 @@ class ServerUDP
             case MessageType.Hello:
                 HandleHelloMessage(clientMessage, remoteEP);
                 break;
-                
             case MessageType.DNSLookup:
                 HandleDNSLookupMessage(clientMessage, remoteEP);
                 break;
-                
             case MessageType.Ack:
                 HandleAcknowledgmentMessage(clientMessage, remoteEP);
                 break;
-                
+            case MessageType.End:
+                HandleEndMessage(clientMessage, remoteEP);
+                break;
             default:
-                HandleUnexpectedMessage(clientMessage, remoteEP);
+                Console.WriteLine($"SERVER Error: Unexpected message type: {clientMessage.MsgType}");
+                SendErrorMessage("Unexpected message type", remoteEP);
                 break;
         }
     }
-    
+
+    private static void HandleEndMessage(Message clientMessage, EndPoint remoteEP)
+    {
+        Console.WriteLine($"SERVER Received End message: {clientMessage.Content}");
+        Console.WriteLine();
+        SendEndMessage(remoteEP);
+    }
+        
     private static void HandleHelloMessage(Message clientMessage, EndPoint remoteEP)
     {
         Console.WriteLine($"SERVER Received Hello from client: {clientMessage.Content}");
+        Console.WriteLine();
 
         // Create and send Welcome message
         int messageId = random.Next(1, 10000);
@@ -205,18 +218,13 @@ class ServerUDP
     {
         try
         {
-            // Deserialize the Content property into a DNSRecord object
             DNSRecord? lookupRecord = JsonSerializer.Deserialize<DNSRecord>(clientMessage.Content.ToString(), options);
-
-            if (lookupRecord != null)
+            if (lookupRecord != null && !string.IsNullOrEmpty(lookupRecord.Type) && !string.IsNullOrEmpty(lookupRecord.Name))
             {
-                string domainName = lookupRecord.Name;
-                string recordType = lookupRecord.Type;
-                Console.WriteLine($"SERVER Received DNS Lookup for: {domainName} (Type: {recordType})");
+                Console.WriteLine($"SERVER Received DNS Lookup for: {lookupRecord.Name} (Type: {lookupRecord.Type})");
 
-                // Find matching DNS record using LINQ
-                DNSRecord? matchingRecord = dnsRecords.FirstOrDefault(r => 
-                    r.Name == domainName && r.Type == recordType);
+                DNSRecord? matchingRecord = dnsRecords.FirstOrDefault(r =>
+                    r.Name == lookupRecord.Name && r.Type == lookupRecord.Type);
 
                 if (matchingRecord != null)
                 {
@@ -224,12 +232,13 @@ class ServerUDP
                 }
                 else
                 {
-                    SendErrorMessage($"Domain {domainName} not found", remoteEP);
+                    Console.WriteLine($"SERVER Reason: No matching DNS record found for {lookupRecord.Name} with type {lookupRecord.Type}");
+                    SendErrorMessage($"Domain {lookupRecord.Name} not found", remoteEP);
                 }
             }
             else
             {
-                Console.WriteLine("SERVER Error: Invalid DNS Lookup message content");
+                Console.WriteLine("SERVER Reason: Invalid DNS Lookup format (missing or empty 'Type' or 'Name')");
                 SendErrorMessage("Invalid DNS Lookup format", remoteEP);
             }
         }
@@ -243,20 +252,14 @@ class ServerUDP
     private static void HandleAcknowledgmentMessage(Message clientMessage, EndPoint remoteEP)
     {
         Console.WriteLine($"SERVER Received Acknowledgment for message ID: {clientMessage.Content}");
-        // The session timer has already been reset when processing the message
-    }
-    
-    private static void HandleUnexpectedMessage(Message clientMessage, EndPoint remoteEP)
-    {
-        Console.WriteLine($"SERVER Received unexpected message type: {clientMessage.MsgType}");
-        SendErrorMessage("Unexpected message type", remoteEP);
+        Console.WriteLine();
     }
     
     private static void SendDNSLookupReply(int originalMsgId, DNSRecord record, EndPoint remoteEP)
     {
         Message dnsReplyMessage = new Message
         {
-            MsgId = originalMsgId, // Use same message ID as request
+            MsgId = originalMsgId, // Use the same MsgId as the request
             MsgType = MessageType.DNSLookupReply,
             Content = record
         };
@@ -295,21 +298,27 @@ class ServerUDP
     
     private static Message? ReceiveMessage(ref EndPoint remoteEP)
     {
-        Console.WriteLine("SERVER: Waiting for client message...");
-        int bytesReceived = socket.ReceiveFrom(buffer, ref remoteEP);
-        string receivedJson = Encoding.UTF8.GetString(buffer, 0, bytesReceived);
-        
-        Console.WriteLine($"SERVER Received from client {remoteEP}: {receivedJson}");
-        Thread.Sleep(3000);
-        Console.WriteLine();
-        
-        try
+        try // error handling: invalid or incomplete message
         {
-            return JsonSerializer.Deserialize<Message>(receivedJson, options);
+            Console.WriteLine("SERVER: Waiting for client message...");
+            int bytesReceived = socket.ReceiveFrom(buffer, ref remoteEP);
+            string receivedJson = Encoding.UTF8.GetString(buffer, 0, bytesReceived);
+
+            Console.WriteLine($"SERVER Received from client {remoteEP}: {receivedJson}");
+            Console.WriteLine();
+            var message = JsonSerializer.Deserialize<Message>(receivedJson, options);
+
+            if (message == null || !Enum.IsDefined(typeof(MessageType), message.MsgType))
+            {
+                Console.WriteLine("SERVER Error: Invalid or incomplete message received.");
+                return null;
+            }
+
+            return message;
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"SERVER Error deserializing message: {ex.Message}");
+            Console.WriteLine($"SERVER Error receiving message: {ex.Message}");
             return null;
         }
     }
