@@ -122,12 +122,67 @@ class ClientUDP
     
     private static void PerformDNSLookups()
     {
-        string[] domains = { "www.sample.com", "www.test.com", "www.abc.com", "www.abcd.com" };
-        string[] recordTypes = { "A", "A", "A", "A" };
+        // First perform valid lookups
+        string[] validDomains = { "www.sample.com", "www.test.com" };
+        string[] validRecordTypes = { "A", "A" };
 
-        for (int i = 0; i < domains.Length; i++)
+        for (int i = 0; i < validDomains.Length; i++)
         {
-            PerformSingleDNSLookup(domains[i], recordTypes[i]);
+            PerformSingleDNSLookup(validDomains[i], validRecordTypes[i]);
+        }
+
+        // Scenario 1: Invalid request with string content instead of DNSRecord
+        Console.WriteLine("\n========== CLIENT PERFORMING INVALID DNS LOOKUP (SCENARIO 1) ==========");
+        int messageId = random.Next(1, 10000);
+        Message invalidMessage1 = new Message
+        {
+            MsgId = messageId,
+            MsgType = MessageType.DNSLookup,
+            Content = "unknown.domain"  // String content instead of DNSRecord
+        };
+
+        SendMessage(invalidMessage1);
+        
+        // Receive error response
+        Message? response1 = ReceiveMessage("Error");
+        if (response1 != null && response1.MsgType == MessageType.Error)
+        {
+            Console.WriteLine();
+            Console.WriteLine("========== CLIENT RECEIVED ERROR (SCENARIO 1) ==========");
+            Console.WriteLine($"Error from server: {response1.Content}");
+        }
+        else
+        {
+            Console.WriteLine("========== CLIENT DNS LOOKUP FAILURE (SCENARIO 1) ==========");
+        }
+
+        // Scenario 2: Invalid request with malformed DNSRecord (missing Name field)
+        Console.WriteLine("\n========== CLIENT PERFORMING INVALID DNS LOOKUP (SCENARIO 2) ==========");
+        messageId = random.Next(1, 10000);
+        
+        // Create a custom object with only Type and Value (missing Name field)
+        var invalidRecord = new { Type = "A", Value = "www.example.com" };
+        
+        Message invalidMessage2 = new Message
+        {
+            MsgId = messageId,
+            MsgType = MessageType.DNSLookup,
+            Content = invalidRecord
+        };
+
+        SendMessage(invalidMessage2);
+        
+        // Receive error response
+        Message? response2 = ReceiveMessage("Error");
+        if (response2 != null && response2.MsgType == MessageType.Error)
+        {
+            Console.WriteLine();
+            Console.WriteLine("========== CLIENT RECEIVED ERROR (SCENARIO 2) ==========");
+            Console.WriteLine($"Error from server: {response2.Content}");
+        }
+        else
+        {
+            Console.WriteLine("========== CLIENT DNS LOOKUP FAILURE (SCENARIO 2) ==========");
         }
 
         // Wait for the End message
@@ -227,9 +282,28 @@ class ClientUDP
             Console.WriteLine($"CLIENT Received from server: {receivedJson}");
             var message = JsonSerializer.Deserialize<Message>(receivedJson, options);
 
-            if (message == null || message.MsgType.ToString() != expectedType)
+            if (message == null)
             {
-                Console.WriteLine($"CLIENT catch: Expected: {expectedType}, Received: {message?.MsgType}");
+                Console.WriteLine($"CLIENT Error: Received null message");
+                return null;
+            }
+            
+            // Allow Error messages when expecting DNSLookupReply for normal lookups
+            if (expectedType == "DNSLookupReply" && message.MsgType == MessageType.Error)
+            {
+                Console.WriteLine($"CLIENT: Received Error instead of DNSLookupReply");
+                return message;
+            }
+            
+            // For explicit Error expectations (for our test scenarios)
+            if (expectedType == "Error" && message.MsgType == MessageType.Error)
+            {
+                return message;
+            }
+
+            if (message.MsgType.ToString() != expectedType)
+            {
+                Console.WriteLine($"CLIENT catch: Expected: {expectedType}, Received: {message.MsgType}");
                 return null;
             }
 
