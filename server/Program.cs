@@ -192,12 +192,14 @@ class ServerUDP
     private static void HandleEndMessage(Message clientMessage, EndPoint remoteEP)
     {
         Console.WriteLine($"SERVER Received End message: {clientMessage.Content}");
+        Console.WriteLine();
         SendEndMessage(remoteEP);
     }
         
     private static void HandleHelloMessage(Message clientMessage, EndPoint remoteEP)
     {
         Console.WriteLine($"SERVER Received Hello from client: {clientMessage.Content}");
+        Console.WriteLine();
 
         // Create and send Welcome message
         int messageId = random.Next(1, 10000);
@@ -250,12 +252,7 @@ class ServerUDP
     private static void HandleAcknowledgmentMessage(Message clientMessage, EndPoint remoteEP)
     {
         Console.WriteLine($"SERVER Received Acknowledgment for message ID: {clientMessage.Content}");
-    }
-    
-    private static void HandleUnexpectedMessage(Message clientMessage, EndPoint remoteEP)
-    {
-        Console.WriteLine($"SERVER Received unexpected message type: {clientMessage.MsgType}");
-        SendErrorMessage("Unexpected message type", remoteEP);
+        Console.WriteLine();
     }
     
     private static void SendDNSLookupReply(int originalMsgId, DNSRecord record, EndPoint remoteEP)
@@ -308,6 +305,7 @@ class ServerUDP
             string receivedJson = Encoding.UTF8.GetString(buffer, 0, bytesReceived);
 
             Console.WriteLine($"SERVER Received from client {remoteEP}: {receivedJson}");
+            Console.WriteLine();
             var message = JsonSerializer.Deserialize<Message>(receivedJson, options);
 
             if (message == null || !Enum.IsDefined(typeof(MessageType), message.MsgType))

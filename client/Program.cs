@@ -189,6 +189,8 @@ class ClientUDP
     
     private static void SendAcknowledgment(int originalMessageId)
     {
+        Console.WriteLine("========== CLIENT SENDING ACK-MSG ==========");
+
         Message ackMessage = new Message
         {
             MsgId = random.Next(1, 10000),
@@ -227,7 +229,7 @@ class ClientUDP
 
             if (message == null || message.MsgType.ToString() != expectedType)
             {
-                Console.WriteLine($"CLIENT Error: Unexpected or invalid message type. Expected: {expectedType}, Received: {message?.MsgType}");
+                Console.WriteLine($"CLIENT catch: Expected: {expectedType}, Received: {message?.MsgType}");
                 return null;
             }
 
