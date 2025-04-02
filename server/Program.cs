@@ -109,7 +109,6 @@ class ServerUDP
     {
         sessionTimer?.Stop();
         sessionTimer?.Start();
-        Console.WriteLine($"SERVER: Session started, will timeout after {SESSION_TIMEOUT_MS/1000} seconds of inactivity");
     }
 
     private static void StopSessionTimer()
