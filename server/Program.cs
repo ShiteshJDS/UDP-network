@@ -75,18 +75,20 @@ class ServerUDP
     
     private static void InitializeSocket()
     {
-        // Create endpoints using settings file
-        IPAddress ipAddress = IPAddress.Parse(setting.ServerIPAddress);
-        IPEndPoint localEndpoint = new IPEndPoint(ipAddress, setting.ServerPortNumber);
+        try // error handling: socket creation
+        {
+            IPAddress ipAddress = IPAddress.Parse(setting.ServerIPAddress);
+            IPEndPoint localEndpoint = new IPEndPoint(ipAddress, setting.ServerPortNumber);
 
-        // Create and bind socket
-        Console.WriteLine("SERVER: Creating and binding socket...");
-        socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
-        socket.Bind(localEndpoint);
-
-        Console.WriteLine($"SERVER Server bound to {localEndpoint}, waiting for client connections...");
-        Thread.Sleep(3000);
-        Console.WriteLine();
+            Console.WriteLine("SERVER: Creating and binding socket...");
+            socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
+            socket.Bind(localEndpoint);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"SERVER Error initializing socket: {ex.Message}");
+            Environment.Exit(1);
+        }
     }
     
     private static void LoadDNSRecords()
@@ -164,22 +166,29 @@ class ServerUDP
     
     private static void ProcessClientMessage(Message clientMessage, EndPoint remoteEP)
     {
+        // error handling: session
+        if (sessionActive && remoteEP != activeClientEndPoint)
+        {
+            Console.WriteLine("SERVER Error: Unexpected client during active session.");
+            SendErrorMessage("Unexpected client during active session", remoteEP);
+            return;
+        }
+
         switch (clientMessage.MsgType)
         {
             case MessageType.Hello:
                 HandleHelloMessage(clientMessage, remoteEP);
                 break;
-                
             case MessageType.DNSLookup:
                 HandleDNSLookupMessage(clientMessage, remoteEP);
                 break;
-                
             case MessageType.Ack:
                 HandleAcknowledgmentMessage(clientMessage, remoteEP);
                 break;
-                
+            // error handling: unexpected message type
             default:
-                HandleUnexpectedMessage(clientMessage, remoteEP);
+                Console.WriteLine($"SERVER Error: Unexpected message type: {clientMessage.MsgType}");
+                SendErrorMessage("Unexpected message type", remoteEP);
                 break;
         }
     }
@@ -295,21 +304,26 @@ class ServerUDP
     
     private static Message? ReceiveMessage(ref EndPoint remoteEP)
     {
-        Console.WriteLine("SERVER: Waiting for client message...");
-        int bytesReceived = socket.ReceiveFrom(buffer, ref remoteEP);
-        string receivedJson = Encoding.UTF8.GetString(buffer, 0, bytesReceived);
-        
-        Console.WriteLine($"SERVER Received from client {remoteEP}: {receivedJson}");
-        Thread.Sleep(3000);
-        Console.WriteLine();
-        
-        try
+        try // error handling: invalid or incomplete message
         {
-            return JsonSerializer.Deserialize<Message>(receivedJson, options);
+            Console.WriteLine("SERVER: Waiting for client message...");
+            int bytesReceived = socket.ReceiveFrom(buffer, ref remoteEP);
+            string receivedJson = Encoding.UTF8.GetString(buffer, 0, bytesReceived);
+
+            Console.WriteLine($"SERVER Received from client {remoteEP}: {receivedJson}");
+            var message = JsonSerializer.Deserialize<Message>(receivedJson, options);
+
+            if (message == null || !Enum.IsDefined(typeof(MessageType), message.MsgType))
+            {
+                Console.WriteLine("SERVER Error: Invalid or incomplete message received.");
+                return null;
+            }
+
+            return message;
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"SERVER Error deserializing message: {ex.Message}");
+            Console.WriteLine($"SERVER Error receiving message: {ex.Message}");
             return null;
         }
     }

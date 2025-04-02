@@ -80,27 +80,27 @@ class ClientUDP
     
     private static void InitializeConnection()
     {
-        Console.WriteLine("CLIENT Starting client application");
+        try // error handling: socket creation
+        {
+            Console.WriteLine("CLIENT Starting client application");
 
-        // Create endpoints using settings file
-        IPAddress serverIPAddress = IPAddress.Parse(setting.ServerIPAddress);
-        serverEndpoint = new IPEndPoint(serverIPAddress, setting.ServerPortNumber);
+            IPAddress serverIPAddress = IPAddress.Parse(setting.ServerIPAddress);
+            serverEndpoint = new IPEndPoint(serverIPAddress, setting.ServerPortNumber);
 
-        // Create local endpoint for binding
-        IPAddress localIPAddress = IPAddress.Parse(setting.ClientIPAddress);
-        IPEndPoint localEndPoint = new IPEndPoint(localIPAddress, 0);
+            IPAddress localIPAddress = IPAddress.Parse(setting.ClientIPAddress);
+            IPEndPoint localEndPoint = new IPEndPoint(localIPAddress, 0);
 
-        IPEndPoint sender = new IPEndPoint(IPAddress.Any, 0);
-        remoteEP = sender;
-        Thread.Sleep(3000);
-        Console.WriteLine();
+            remoteEP = new IPEndPoint(IPAddress.Any, 0);
 
-        // Create socket
-        Console.WriteLine("CLIENT: Creating and binding socket...");
-        socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
-        socket.Bind(localEndPoint);
-        Thread.Sleep(3000);
-        Console.WriteLine();
+            Console.WriteLine("CLIENT: Creating and binding socket...");
+            socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
+            socket.Bind(localEndPoint);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"CLIENT Error initializing connection: {ex.Message}");
+            Environment.Exit(1);
+        }
     }
     
     private static Message? PerformHandshake()
@@ -265,16 +265,28 @@ class ClientUDP
     
     private static Message? ReceiveMessage(string expectedType)
     {
-        Console.WriteLine($"CLIENT: Waiting for {expectedType} message...");
-        
-        int bytesReceived = socket.ReceiveFrom(buffer, ref remoteEP);
-        string receivedJson = Encoding.UTF8.GetString(buffer, 0, bytesReceived);
-        
-        Console.WriteLine($"CLIENT Received from server: {receivedJson}");
-        Thread.Sleep(3000);
-        Console.WriteLine();
-        
-        return JsonSerializer.Deserialize<Message>(receivedJson, options);
+        try // error handling unexpected / invalid message types
+        {
+            Console.WriteLine($"CLIENT: Waiting for {expectedType} message...");
+            int bytesReceived = socket.ReceiveFrom(buffer, ref remoteEP);
+            string receivedJson = Encoding.UTF8.GetString(buffer, 0, bytesReceived);
+
+            Console.WriteLine($"CLIENT Received from server: {receivedJson}");
+            var message = JsonSerializer.Deserialize<Message>(receivedJson, options);
+
+            if (message == null || message.MsgType.ToString() != expectedType)
+            {
+                Console.WriteLine($"CLIENT Error: Unexpected or invalid message type. Expected: {expectedType}, Received: {message?.MsgType}");
+                return null;
+            }
+
+            return message;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"CLIENT Error receiving message: {ex.Message}");
+            return null;
+        }
     }
 
     // Add a separate method to check for End message
