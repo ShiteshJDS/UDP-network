@@ -165,7 +165,10 @@ class ClientUDP
         Message? response = ReceiveMessage("DNSLookupReply");
         if (response != null && response.MsgType == MessageType.DNSLookupReply)
         {
+            Console.WriteLine();
             Console.WriteLine("========== CLIENT DNS LOOKUP SUCCESSFUL ==========");
+            Console.WriteLine();
+
             Console.WriteLine($"Response: {response.Content}");
 
             // Send Ack message
@@ -179,6 +182,8 @@ class ClientUDP
         {
             Console.WriteLine();
             Console.WriteLine("========== CLIENT DNS LOOKUP FAILURE ==========");
+            Console.WriteLine();
+
         }
     }
     

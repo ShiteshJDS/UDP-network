@@ -138,6 +138,8 @@ class ServerUDP
         while (true)
         {
             Console.WriteLine("\n========== WAITING FOR CLIENT MESSAGE ==========");
+            Console.WriteLine();
+
             Thread.Sleep(3000);
 
             // Receive message from client
@@ -228,11 +230,13 @@ class ServerUDP
                 }
                 else
                 {
+                    Console.WriteLine($"SERVER Reason: No matching DNS record found for {lookupRecord.Name} with type {lookupRecord.Type}");
                     SendErrorMessage($"Domain {lookupRecord.Name} not found", remoteEP);
                 }
             }
             else
             {
+                Console.WriteLine("SERVER Reason: Invalid DNS Lookup format (missing or empty 'Type' or 'Name')");
                 SendErrorMessage("Invalid DNS Lookup format", remoteEP);
             }
         }
