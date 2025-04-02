@@ -166,14 +166,6 @@ class ServerUDP
     
     private static void ProcessClientMessage(Message clientMessage, EndPoint remoteEP)
     {
-        // error handling: session
-        if (sessionActive && remoteEP != activeClientEndPoint)
-        {
-            Console.WriteLine("SERVER Error: Unexpected client during active session.");
-            SendErrorMessage("Unexpected client during active session", remoteEP);
-            return;
-        }
-
         switch (clientMessage.MsgType)
         {
             case MessageType.Hello:
@@ -185,14 +177,22 @@ class ServerUDP
             case MessageType.Ack:
                 HandleAcknowledgmentMessage(clientMessage, remoteEP);
                 break;
-            // error handling: unexpected message type
+            case MessageType.End:
+                HandleEndMessage(clientMessage, remoteEP);
+                break;
             default:
                 Console.WriteLine($"SERVER Error: Unexpected message type: {clientMessage.MsgType}");
                 SendErrorMessage("Unexpected message type", remoteEP);
                 break;
         }
     }
-    
+
+    private static void HandleEndMessage(Message clientMessage, EndPoint remoteEP)
+    {
+        Console.WriteLine($"SERVER Received End message: {clientMessage.Content}");
+        SendEndMessage(remoteEP);
+    }
+        
     private static void HandleHelloMessage(Message clientMessage, EndPoint remoteEP)
     {
         Console.WriteLine($"SERVER Received Hello from client: {clientMessage.Content}");
@@ -214,18 +214,13 @@ class ServerUDP
     {
         try
         {
-            // Deserialize the Content property into a DNSRecord object
             DNSRecord? lookupRecord = JsonSerializer.Deserialize<DNSRecord>(clientMessage.Content.ToString(), options);
-
-            if (lookupRecord != null)
+            if (lookupRecord != null && !string.IsNullOrEmpty(lookupRecord.Type) && !string.IsNullOrEmpty(lookupRecord.Name))
             {
-                string domainName = lookupRecord.Name;
-                string recordType = lookupRecord.Type;
-                Console.WriteLine($"SERVER Received DNS Lookup for: {domainName} (Type: {recordType})");
+                Console.WriteLine($"SERVER Received DNS Lookup for: {lookupRecord.Name} (Type: {lookupRecord.Type})");
 
-                // Find matching DNS record using LINQ
-                DNSRecord? matchingRecord = dnsRecords.FirstOrDefault(r => 
-                    r.Name == domainName && r.Type == recordType);
+                DNSRecord? matchingRecord = dnsRecords.FirstOrDefault(r =>
+                    r.Name == lookupRecord.Name && r.Type == lookupRecord.Type);
 
                 if (matchingRecord != null)
                 {
@@ -233,12 +228,11 @@ class ServerUDP
                 }
                 else
                 {
-                    SendErrorMessage($"Domain {domainName} not found", remoteEP);
+                    SendErrorMessage($"Domain {lookupRecord.Name} not found", remoteEP);
                 }
             }
             else
             {
-                Console.WriteLine("SERVER Error: Invalid DNS Lookup message content");
                 SendErrorMessage("Invalid DNS Lookup format", remoteEP);
             }
         }
@@ -252,7 +246,6 @@ class ServerUDP
     private static void HandleAcknowledgmentMessage(Message clientMessage, EndPoint remoteEP)
     {
         Console.WriteLine($"SERVER Received Acknowledgment for message ID: {clientMessage.Content}");
-        // The session timer has already been reset when processing the message
     }
     
     private static void HandleUnexpectedMessage(Message clientMessage, EndPoint remoteEP)
@@ -265,7 +258,7 @@ class ServerUDP
     {
         Message dnsReplyMessage = new Message
         {
-            MsgId = originalMsgId, // Use same message ID as request
+            MsgId = originalMsgId, // Use the same MsgId as the request
             MsgType = MessageType.DNSLookupReply,
             Content = record
         };

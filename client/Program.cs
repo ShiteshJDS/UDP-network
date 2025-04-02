@@ -122,53 +122,36 @@ class ClientUDP
     
     private static void PerformDNSLookups()
     {
-        // Valid domains (existing in the server's DNS records)
-        string[] validDomains = { "www.sample.com", "www.test.com" };
-        
-        // Invalid domains (non-existent in the server's DNS records)
-        string[] invalidDomains = { "www.abc.com", "www.abcd.com" };
-        
-        // Process all lookups
-        foreach (var domain in validDomains)
+        string[] domains = { "www.sample.com", "www.test.com", "www.abc.com", "www.abcd.com" };
+        string[] recordTypes = { "A", "A", "A", "A" };
+
+        for (int i = 0; i < domains.Length; i++)
         {
-            PerformSingleDNSLookup(domain, "A");  // Using A record type
+            PerformSingleDNSLookup(domains[i], recordTypes[i]);
         }
-        
-        foreach (var domain in invalidDomains)
-        {
-            PerformSingleDNSLookup(domain, "A");  // Using A record type
-        }
-        
-        // After all lookups, wait a bit longer for the final End message
+
+        // Wait for the End message
         try
         {
-            socket.ReceiveTimeout = 5000; // 5 second timeout for final End message
             Message? endMessage = ReceiveMessage("End");
-            
             if (endMessage != null && endMessage.MsgType == MessageType.End)
             {
                 Console.WriteLine("========== CLIENT SESSION ENDED ==========");
             }
         }
-        catch (SocketException)
+        catch (Exception ex)
         {
-            Console.WriteLine("CLIENT: Did not receive End message after all lookups completed");
+            Console.WriteLine($"CLIENT Error receiving End message: {ex.Message}");
         }
     }
     
     private static void PerformSingleDNSLookup(string domain, string recordType)
     {
         Console.WriteLine($"\n========== CLIENT PERFORMING DNS LOOKUP FOR {domain} ==========");
-        
-        // Create a proper DNSRecord object for lookup
-        DNSRecord lookupRecord = new DNSRecord
-        {
-            Type = recordType,
-            Name = domain
-        };
 
         // Create and send DNSLookup message
         int messageId = random.Next(1, 10000);
+        DNSRecord lookupRecord = new DNSRecord { Type = recordType, Name = domain };
         Message dnsLookupMessage = new Message
         {
             MsgId = messageId,
@@ -177,71 +160,33 @@ class ClientUDP
         };
 
         SendMessage(dnsLookupMessage);
-        
-        // Receive response (could be DNSLookupReply or Error)
-        Message? response = ReceiveMessage("DNS Lookup Reply");
-        
-        if (response != null)
-        {
-            ProcessDNSResponse(response, messageId);
-        }
-        else
-        {
-            Console.WriteLine("CLIENT Error: No response received from server");
-        }
-    }
-    
-    private static void ProcessDNSResponse(Message response, int lookupMessageId)
-    {
-        if (response.MsgType == MessageType.DNSLookupReply)
+
+        // Receive response (DNSLookupReply or Error)
+        Message? response = ReceiveMessage("DNSLookupReply");
+        if (response != null && response.MsgType == MessageType.DNSLookupReply)
         {
             Console.WriteLine("========== CLIENT DNS LOOKUP SUCCESSFUL ==========");
-            
-            // Handle DNS record
-            try
-            {
-                string recordJson = response.Content.ToString();
-                DNSRecord? record = JsonSerializer.Deserialize<DNSRecord>(recordJson, options);
+            Console.WriteLine($"Response: {response.Content}");
 
-                if (record != null)
-                {
-                    Console.WriteLine($"Type: {record.Type}");
-                    Console.WriteLine($"Name: {record.Name}");
-                    Console.WriteLine($"Value: {record.Value}");
-                    Console.WriteLine($"TTL: {record.TTL}");
-                    if (record.Priority != null)
-                    {
-                        Console.WriteLine($"Priority: {record.Priority}");
-                    }
-
-                    // Send Acknowledgment
-                    SendAcknowledgment(lookupMessageId);
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"CLIENT Error parsing DNS record: {ex.Message}");
-            }
+            // Send Ack message
+            SendAcknowledgment(messageId);
         }
-        else if (response.MsgType == MessageType.Error)
+        else if (response != null && response.MsgType == MessageType.Error)
         {
             Console.WriteLine($"CLIENT Error from server: {response.Content}");
         }
         else
         {
-            Console.WriteLine($"CLIENT Unexpected response type: {response.MsgType}");
-            return;
+            Console.WriteLine();
+            Console.WriteLine("========== CLIENT DNS LOOKUP FAILURE ==========");
         }
-        
-        CheckForEndMessage();
     }
     
     private static void SendAcknowledgment(int originalMessageId)
     {
-        int messageId = random.Next(1, 10000);
         Message ackMessage = new Message
         {
-            MsgId = messageId,
+            MsgId = random.Next(1, 10000),
             MsgType = MessageType.Ack,
             Content = originalMessageId
         };
@@ -268,6 +213,7 @@ class ClientUDP
         try // error handling unexpected / invalid message types
         {
             Console.WriteLine($"CLIENT: Waiting for {expectedType} message...");
+            Console.WriteLine();
             int bytesReceived = socket.ReceiveFrom(buffer, ref remoteEP);
             string receivedJson = Encoding.UTF8.GetString(buffer, 0, bytesReceived);
 
