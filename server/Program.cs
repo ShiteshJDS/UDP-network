@@ -8,6 +8,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Timers;
 using LibData;
 
 // ReceiveFrom();
@@ -43,10 +44,11 @@ class ServerUDP
     private static readonly byte[] buffer = new byte[1024];
     private static List<DNSRecord> dnsRecords = new();
 
-
-    // Counter to track lookups
-    private static int lookupCounter = 0;
-    private static int expectedLookups = 4;
+    // Session timeout management
+    private static System.Timers.Timer? sessionTimer;
+    private static readonly int SESSION_TIMEOUT_MS = 10000; // 10 seconds
+    private static EndPoint? activeClientEndPoint = null;
+    private static bool sessionActive = false;
 
     public static void start()
     {
@@ -60,6 +62,7 @@ class ServerUDP
 
             InitializeSocket();
             LoadDNSRecords();
+            InitializeSessionTimer();
             
             // Main server loop
             RunServerLoop();
@@ -94,6 +97,37 @@ class ServerUDP
         Thread.Sleep(3000);
         Console.WriteLine();
     }
+
+    private static void InitializeSessionTimer()
+    {
+        sessionTimer = new System.Timers.Timer(SESSION_TIMEOUT_MS);
+        sessionTimer.Elapsed += OnSessionTimeout;
+        sessionTimer.AutoReset = false;
+    }
+
+    private static void StartSessionTimer()
+    {
+        sessionTimer?.Stop();
+        sessionTimer?.Start();
+        Console.WriteLine($"SERVER: Session started, will timeout after {SESSION_TIMEOUT_MS/1000} seconds of inactivity");
+    }
+
+    private static void StopSessionTimer()
+    {
+        sessionTimer?.Stop();
+    }
+
+    private static void OnSessionTimeout(object? sender, ElapsedEventArgs e)
+    {
+        if (sessionActive && activeClientEndPoint != null)
+        {
+            Console.WriteLine($"SERVER: Session timeout after {SESSION_TIMEOUT_MS/1000} seconds of inactivity");
+            SendEndMessage(activeClientEndPoint);
+            Console.WriteLine("========== SERVER SESSION COMPLETED (TIMEOUT) ==========");
+            sessionActive = false;
+            activeClientEndPoint = null;
+        }
+    }
     
     private static void RunServerLoop()
     {
@@ -110,6 +144,16 @@ class ServerUDP
             
             if (clientMessage != null)
             {
+                // Update client session and reset timer
+                if (!sessionActive)
+                {
+                    sessionActive = true;
+                    activeClientEndPoint = remoteEP;
+                }
+                
+                // Reset the session timer as we received a message
+                StartSessionTimer();
+                
                 ProcessClientMessage(clientMessage, remoteEP);
             }
             else
@@ -160,9 +204,6 @@ class ServerUDP
     
     private static void HandleDNSLookupMessage(Message clientMessage, EndPoint remoteEP)
     {
-        // Increment counter for each lookup (valid or invalid)
-        lookupCounter++;
-
         try
         {
             // Deserialize the Content property into a DNSRecord object
@@ -198,29 +239,12 @@ class ServerUDP
             Console.WriteLine($"SERVER Error processing DNS Lookup: {ex.Message}");
             SendErrorMessage("Error processing DNS request", remoteEP);
         }
-
-        // Check if all lookups are completed
-        if (lookupCounter >= expectedLookups)
-        {
-            SendEndMessage(remoteEP);
-            Console.WriteLine("========== SERVER SESSION COMPLETED ==========");
-            lookupCounter = 0; // Reset counter for the next session
-        }
     }
     
     private static void HandleAcknowledgmentMessage(Message clientMessage, EndPoint remoteEP)
     {
         Console.WriteLine($"SERVER Received Acknowledgment for message ID: {clientMessage.Content}");
-
-        // Send End message
-        // Only send End message if this is the last expected lookup
-        if (lookupCounter >= expectedLookups)
-        {
-            SendEndMessage(remoteEP);
-            Console.WriteLine("========== SERVER SESSION COMPLETED ==========");
-            // Reset counter for next client
-            lookupCounter = 0;
-        }
+        // The session timer has already been reset when processing the message
     }
     
     private static void HandleUnexpectedMessage(Message clientMessage, EndPoint remoteEP)
@@ -263,6 +287,11 @@ class ServerUDP
         };
 
         SendMessage(endMessage, remoteEP, "End");
+        
+        // End the session
+        StopSessionTimer();
+        sessionActive = false;
+        activeClientEndPoint = null;
     }
     
     private static Message? ReceiveMessage(ref EndPoint remoteEP)
