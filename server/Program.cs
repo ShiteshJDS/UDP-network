@@ -38,7 +38,7 @@ class ServerUDP
     {
         Converters = { new JsonStringEnumConverter() }
     };
-    
+
     private static Socket? socket;
     private static readonly Random random = new();
     private static readonly byte[] buffer = new byte[1024];
@@ -63,8 +63,8 @@ class ServerUDP
             InitializeSocket();
             LoadDNSRecords();
             InitializeSessionTimer();
-            
-            // Main server loop
+
+            // Loop voor de main server
             RunServerLoop();
         }
         catch (Exception ex)
@@ -72,7 +72,7 @@ class ServerUDP
             Console.WriteLine($"\n Socket Error. Terminating: {ex.Message}");
         }
     }
-    
+
     private static void InitializeSocket()
     {
         try // error handling: socket creation
@@ -90,7 +90,7 @@ class ServerUDP
             Environment.Exit(1);
         }
     }
-    
+
     private static void LoadDNSRecords()
     {
         Console.WriteLine("SERVER: Loading DNS records...");
@@ -122,19 +122,19 @@ class ServerUDP
     {
         if (sessionActive && activeClientEndPoint != null)
         {
-            Console.WriteLine($"SERVER: Session timeout after {SESSION_TIMEOUT_MS/1000} seconds of inactivity");
+            Console.WriteLine($"SERVER: Session timeout after {SESSION_TIMEOUT_MS / 1000} seconds of inactivity");
             SendEndMessage(activeClientEndPoint);
             Console.WriteLine("========== SERVER SESSION COMPLETED (TIMEOUT) ==========");
             sessionActive = false;
             activeClientEndPoint = null;
         }
     }
-    
+
     private static void RunServerLoop()
     {
         IPEndPoint sender = new IPEndPoint(IPAddress.Any, 0);
         EndPoint remoteEP = sender;
-        
+
         while (true)
         {
             Console.WriteLine("\n========== WAITING FOR CLIENT MESSAGE ==========");
@@ -142,21 +142,21 @@ class ServerUDP
 
             Thread.Sleep(3000);
 
-            // Receive message from client
+            // Ontvang message van client
             Message? clientMessage = ReceiveMessage(ref remoteEP);
-            
+
             if (clientMessage != null)
             {
-                // Update client session and reset timer
+                // Update client session en reset timer
                 if (!sessionActive)
                 {
                     sessionActive = true;
                     activeClientEndPoint = remoteEP;
                 }
-                
-                // Reset the session timer as we received a message
+
+                // Reset de session timer als we een message ontvangen
                 StartSessionTimer();
-                
+
                 ProcessClientMessage(clientMessage, remoteEP);
             }
             else
@@ -165,7 +165,7 @@ class ServerUDP
             }
         }
     }
-    
+
     private static void ProcessClientMessage(Message clientMessage, EndPoint remoteEP)
     {
         switch (clientMessage.MsgType)
@@ -195,13 +195,13 @@ class ServerUDP
         Console.WriteLine();
         SendEndMessage(remoteEP);
     }
-        
+
     private static void HandleHelloMessage(Message clientMessage, EndPoint remoteEP)
     {
         Console.WriteLine($"SERVER Received Hello from client: {clientMessage.Content}");
         Console.WriteLine();
 
-        // Create and send Welcome message
+        // Create en send Welcome message
         int messageId = random.Next(1, 10000);
         Message welcomeMessage = new Message
         {
@@ -213,7 +213,7 @@ class ServerUDP
         SendMessage(welcomeMessage, remoteEP);
         Console.WriteLine("========== SERVER HANDSHAKE COMPLETED ==========");
     }
-    
+
     private static void HandleDNSLookupMessage(Message clientMessage, EndPoint remoteEP)
     {
         try
@@ -238,7 +238,7 @@ class ServerUDP
             }
             else
             {
-                Console.WriteLine("SERVER Reason: Invalid DNS Lookup format (missing or empty 'Type' or 'Name')");
+                Console.WriteLine("SERVER Reason: Invalid DNS Lookup format");
                 SendErrorMessage("Invalid DNS Lookup format", remoteEP);
             }
         }
@@ -248,25 +248,25 @@ class ServerUDP
             SendErrorMessage("Error processing DNS request", remoteEP);
         }
     }
-    
+
     private static void HandleAcknowledgmentMessage(Message clientMessage, EndPoint remoteEP)
     {
         Console.WriteLine($"SERVER Received Acknowledgment for message ID: {clientMessage.Content}");
         Console.WriteLine();
     }
-    
+
     private static void SendDNSLookupReply(int originalMsgId, DNSRecord record, EndPoint remoteEP)
     {
         Message dnsReplyMessage = new Message
         {
-            MsgId = originalMsgId, // Use the same MsgId as the request
+            MsgId = originalMsgId, // Gebruik dezelfde msgId als de original message
             MsgType = MessageType.DNSLookupReply,
             Content = record
         };
 
         SendMessage(dnsReplyMessage, remoteEP, "DNSLookupReply");
     }
-    
+
     private static void SendErrorMessage(string errorContent, EndPoint remoteEP)
     {
         Message errorMessage = new Message
@@ -278,7 +278,7 @@ class ServerUDP
 
         SendMessage(errorMessage, remoteEP, "Error");
     }
-    
+
     private static void SendEndMessage(EndPoint remoteEP)
     {
         Message endMessage = new Message
@@ -289,16 +289,16 @@ class ServerUDP
         };
 
         SendMessage(endMessage, remoteEP, "End");
-        
-        // End the session
+
+        // End de session
         StopSessionTimer();
         sessionActive = false;
         activeClientEndPoint = null;
     }
-    
+
     private static Message? ReceiveMessage(ref EndPoint remoteEP)
     {
-        try // error handling: invalid or incomplete message
+        try // error handling: invalid of incomplete message
         {
             Console.WriteLine("SERVER: Waiting for client message...");
             int bytesReceived = socket.ReceiveFrom(buffer, ref remoteEP);
@@ -322,20 +322,20 @@ class ServerUDP
             return null;
         }
     }
-    
+
     private static void SendMessage(Message message, EndPoint remoteEP, string messageType = "")
     {
         string type = string.IsNullOrEmpty(messageType) ? message.MsgType.ToString() : messageType;
         string messageJson = JsonSerializer.Serialize(message, options);
         byte[] msg = Encoding.UTF8.GetBytes(messageJson);
-        
+
         Console.WriteLine($"SERVER Sending {type} message: {messageJson}");
         socket.SendTo(msg, msg.Length, SocketFlags.None, remoteEP);
         Thread.Sleep(3000);
         Console.WriteLine();
     }
 
-    // Read DNS records from file
+    // Haal alle DNS records op uit het JSON bestand
     public static List<DNSRecord> ReadDNSRecords()
     {
         try
