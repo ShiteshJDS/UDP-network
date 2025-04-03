@@ -52,7 +52,7 @@ class ClientUDP
 
             InitializeConnection();
             
-            // Start protocol flow
+            // Start van de protocol flow
             var welcomeMessage = PerformHandshake();
             
             if (welcomeMessage != null && welcomeMessage.MsgType == MessageType.Welcome)
@@ -62,7 +62,7 @@ class ClientUDP
                 Thread.Sleep(3000);
                 Console.WriteLine();
                 
-                // Perform multiple DNS lookups as required
+                // meerdere DNS lookups
                 PerformDNSLookups();
             }
             else
@@ -105,7 +105,7 @@ class ClientUDP
     
     private static Message? PerformHandshake()
     {
-        // Create and send Hello message
+        // maak de welcome en hello message aan
         int messageId = random.Next(1, 1000);
         Message helloMessage = new Message
         {
@@ -116,13 +116,13 @@ class ClientUDP
 
         SendMessage(helloMessage);
         
-        // Receive Welcome message
+        //  Welcome message komt binnen
         return ReceiveMessage("Welcome");
     }
     
     private static void PerformDNSLookups()
     {
-        // First perform valid lookups
+        // eerst de valid lookups
         string[] validDomains = { "www.sample.com", "www.test.com" };
         string[] validRecordTypes = { "A", "A" };
 
@@ -131,19 +131,19 @@ class ClientUDP
             PerformSingleDNSLookup(validDomains[i], validRecordTypes[i]);
         }
 
-        // Scenario 1: Invalid request with string content instead of DNSRecord
+        // Scenario 1: Invalid request met string als content ipv DNSRecord
         Console.WriteLine("\n========== CLIENT PERFORMING INVALID DNS LOOKUP (SCENARIO 1) ==========");
         int messageId = random.Next(1, 10000);
         Message invalidMessage1 = new Message
         {
             MsgId = messageId,
             MsgType = MessageType.DNSLookup,
-            Content = "unknown.domain"  // String content instead of DNSRecord
+            Content = "unknown.domain"  // hier string content ipv DNSRecord
         };
 
         SendMessage(invalidMessage1);
         
-        // Receive error response
+        // error response moet binnen komen daarna
         Message? response1 = ReceiveMessage("Error");
         if (response1 != null && response1.MsgType == MessageType.Error)
         {
@@ -156,11 +156,11 @@ class ClientUDP
             Console.WriteLine("========== CLIENT DNS LOOKUP FAILURE (SCENARIO 1) ==========");
         }
 
-        // Scenario 2: Invalid request with malformed DNSRecord (missing Name field)
+        // Scenario 2: Invalid request met invalid DNSRecord (gene Name field)
         Console.WriteLine("\n========== CLIENT PERFORMING INVALID DNS LOOKUP (SCENARIO 2) ==========");
         messageId = random.Next(1, 10000);
         
-        // Create a custom object with only Type and Value (missing Name field)
+        // maak custom object met alleen Type and Value (geen Name field, net als in example)
         var invalidRecord = new { Type = "A", Value = "www.example.com" };
         
         Message invalidMessage2 = new Message
@@ -172,7 +172,7 @@ class ClientUDP
 
         SendMessage(invalidMessage2);
         
-        // Receive error response
+        // error response moet binnen komen
         Message? response2 = ReceiveMessage("Error");
         if (response2 != null && response2.MsgType == MessageType.Error)
         {
@@ -185,7 +185,7 @@ class ClientUDP
             Console.WriteLine("========== CLIENT DNS LOOKUP FAILURE (SCENARIO 2) ==========");
         }
 
-        // Wait for the End message
+        // checken wacht voor End-MSG
         try
         {
             Message? endMessage = ReceiveMessage("End");
@@ -204,7 +204,7 @@ class ClientUDP
     {
         Console.WriteLine($"\n========== CLIENT PERFORMING DNS LOOKUP FOR {domain} ==========");
 
-        // Create and send DNSLookup message
+        // meek en stuur DNSLookup message
         int messageId = random.Next(1, 10000);
         DNSRecord lookupRecord = new DNSRecord { Type = recordType, Name = domain };
         Message dnsLookupMessage = new Message
@@ -216,7 +216,7 @@ class ClientUDP
 
         SendMessage(dnsLookupMessage);
 
-        // Receive response (DNSLookupReply or Error)
+        // krijg response binnen (DNSLookupReply of Error)
         Message? response = ReceiveMessage("DNSLookupReply");
         if (response != null && response.MsgType == MessageType.DNSLookupReply)
         {
@@ -226,7 +226,7 @@ class ClientUDP
 
             Console.WriteLine($"Response: {response.Content}");
 
-            // Send Ack message
+            // stuur Ack message
             SendAcknowledgment(messageId);
         }
         else if (response != null && response.MsgType == MessageType.Error)
@@ -288,14 +288,14 @@ class ClientUDP
                 return null;
             }
             
-            // Allow Error messages when expecting DNSLookupReply for normal lookups
+            // laat Error messages door wann je DNSLookupReply verwacht voor normale lookup
             if (expectedType == "DNSLookupReply" && message.MsgType == MessageType.Error)
             {
                 Console.WriteLine($"CLIENT: Received Error instead of DNSLookupReply");
                 return message;
             }
             
-            // For explicit Error expectations (for our test scenarios)
+            // Hier expliciete error verwachtingen voor de scnarios 1/2
             if (expectedType == "Error" && message.MsgType == MessageType.Error)
             {
                 return message;
@@ -313,32 +313,6 @@ class ClientUDP
         {
             Console.WriteLine($"CLIENT Error receiving message: {ex.Message}");
             return null;
-        }
-    }
-
-    // Add a separate method to check for End message
-    private static void CheckForEndMessage()
-    {
-        try
-        {
-            // Check if there's a message waiting with a shorter timeout
-            socket.ReceiveTimeout = 1000; // 1 second timeout
-            Message? endMessage = ReceiveMessage("End");
-            
-            if (endMessage != null && endMessage.MsgType == MessageType.End)
-            {
-                Console.WriteLine("========== CLIENT SESSION ENDED ==========");
-                // Exit the application
-                Environment.Exit(0);
-            }
-            
-            // Reset timeout to default
-            socket.ReceiveTimeout = 0;
-        }
-        catch (SocketException ex) when (ex.SocketErrorCode == SocketError.TimedOut)
-        {
-            // No message available, continue with next lookup
-            socket.ReceiveTimeout = 0;
         }
     }
 }
